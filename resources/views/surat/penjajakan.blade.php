@@ -302,7 +302,7 @@ $(document).ready(function() {
         width: '100%'
     });
 
-    // Initialize Flatpickr dengan tanggal otomatis hari ini
+    // Initialize Flatpickr
     flatpickr("#tanggal_surat", {
         locale: "id",
         dateFormat: "Y-m-d",
@@ -328,13 +328,12 @@ $(document).ready(function() {
         theme: "material_blue"
     });
 
-    // Auto-fill alamat when DUDI selected - FIX: Gunakan URL manual
+    // Auto-fill alamat when DUDI selected
     dudiSelect.on('change', function() {
         const dudiId = $(this).find(':selected').data('id');
         
         if (dudiId) {
-            // FIX: Gunakan URL manual dengan base URL + path
-            fetch(`${window.location.origin}/api/dudi/${dudiId}`)
+            fetch(`/api/dudi/${dudiId}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -347,20 +346,17 @@ $(document).ready(function() {
         }
     });
 
-    // Form submission untuk preview
+    // Form submission
     $('#suratForm').on('submit', function(e) {
         e.preventDefault();
         
-        // Validasi form
         if (!this.checkValidity()) {
             this.reportValidity();
             return;
         }
 
-        // Tampilkan loading
         $('#loadingModal').removeClass('hidden');
 
-        // Submit form via AJAX
         $.ajax({
             url: '{{ route("surat.penjajakan.preview") }}',
             method: 'POST',
@@ -372,36 +368,33 @@ $(document).ready(function() {
                 
                 if (response.success) {
                     currentFilename = response.filename;
-                    pdfUrl = response.pdf_url;
+                    pdfUrl = response.url;
                     
-                    // Tampilkan PDF di iframe
+                    // Tampilkan PDF/DOCX di iframe
                     $('#pdfPreview').html(`
-                        <iframe src="${response.pdf_url}" 
-                                style="width: 100%; height: 600px; border: none;" 
-                                onload="this.style.height=(this.contentWindow.document.body.scrollHeight+20)+'px'">
+                        <iframe src="${response.url}" 
+                                style="width: 100%; height: 600px; border: none;">
                         </iframe>
                     `);
                     
-                    // Tampilkan modal preview
                     $('#previewModal').removeClass('hidden');
                 } else {
-                    alert('Gagal membuat preview: ' + response.message);
+                    alert('Gagal: ' + response.message);
                 }
             },
             error: function(xhr) {
                 $('#loadingModal').addClass('hidden');
-                alert('Terjadi kesalahan: ' + (xhr.responseJSON?.message || 'Unknown error'));
+                console.error('Error:', xhr);
+                alert('Error: ' + (xhr.responseJSON?.message || 'Unknown error'));
             }
         });
     });
 });
 
-// Fungsi tutup preview
 function closePreview() {
     $('#previewModal').addClass('hidden');
 }
 
-// Fungsi cetak surat
 function printSurat() {
     if (pdfUrl) {
         const printWindow = window.open(pdfUrl, '_blank');
@@ -411,7 +404,6 @@ function printSurat() {
     }
 }
 
-// Fungsi download surat
 function downloadSurat(type) {
     if (!currentFilename) return;
     
@@ -423,7 +415,7 @@ function downloadSurat(type) {
         data: {
             _token: '{{ csrf_token() }}',
             filename: currentFilename,
-            type: type
+            format: type
         },
         xhrFields: {
             responseType: 'blob'
@@ -443,8 +435,9 @@ function downloadSurat(type) {
             link.download = filename;
             link.click();
         },
-        error: function() {
+        error: function(xhr) {
             $('#loadingModal').addClass('hidden');
+            console.error('Download error:', xhr);
             alert('Gagal mengunduh file');
         }
     });
